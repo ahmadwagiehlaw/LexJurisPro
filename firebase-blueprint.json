@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier for the user" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "displayName": { "type": "string", "description": "User's display name" },
+        "photoURL": { "type": "string", "format": "uri", "description": "User's profile photo URL" },
+        "role": { "type": "string", "enum": ["admin", "lawyer", "assistant"], "description": "User's role in the system" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user profile was created" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Case": {
+      "title": "Case",
+      "description": "Legal case information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Case reference number" },
+        "title": { "type": "string", "description": "Case title" },
+        "client": { "type": "string", "description": "Client name" },
+        "court": { "type": "string", "description": "Court name" },
+        "type": { "type": "string", "description": "Type of case (e.g., Civil, Criminal)" },
+        "status": { "type": "string", "description": "Current status of the case" },
+        "statusColor": { "type": "string", "description": "Tailwind color class for status" },
+        "nextSession": { "type": "string", "description": "Date of the next session" },
+        "urgent": { "type": "boolean", "description": "Whether the case is urgent" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the case was created" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the case was last updated" }
+      },
+      "required": ["title", "client", "uid"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Court session or meeting",
+      "type": "object",
+      "properties": {
+        "caseId": { "type": "string", "description": "Reference to the Case ID" },
+        "time": { "type": "string", "description": "Session time" },
+        "date": { "type": "string", "format": "date", "description": "Session date" },
+        "title": { "type": "string", "description": "Session title" },
+        "court": { "type": "string", "description": "Court name" },
+        "chamber": { "type": "string", "description": "Chamber or room" },
+        "client": { "type": "string", "description": "Client name" },
+        "opponent": { "type": "string", "description": "Opponent name" },
+        "status": { "type": "string", "description": "Session status" },
+        "statusColor": { "type": "string", "description": "Tailwind color class for status" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the session was created" }
+      },
+      "required": ["title", "date", "uid"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Legal document or attachment",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "File name" },
+        "type": { "type": "string", "description": "Document type" },
+        "size": { "type": "string", "description": "File size" },
+        "url": { "type": "string", "format": "uri", "description": "File URL" },
+        "caseId": { "type": "string", "description": "Reference to the Case ID" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the document was uploaded" }
+      },
+      "required": ["name", "url", "uid"]
+    },
+    "Research": {
+      "title": "Research",
+      "description": "Legal research or judgment",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Research title" },
+        "date": { "type": "string", "description": "Publication date" },
+        "court": { "type": "string", "description": "Court name" },
+        "category": { "type": "string", "description": "Legal category" },
+        "content": { "type": "string", "description": "Research content or summary" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the research was added" }
+      },
+      "required": ["title", "uid"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Bookmarked legal resource",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Bookmark title" },
+        "source": { "type": "string", "description": "Resource source" },
+        "type": { "type": "string", "description": "Resource type" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the bookmark was added" }
+      },
+      "required": ["title", "uid"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/cases/{caseId}": {
+      "schema": "Case",
+      "description": "Legal cases"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Court sessions"
+    },
+    "/documents/{docId}": {
+      "schema": "Document",
+      "description": "Case documents"
+    },
+    "/research/{researchId}": {
+      "schema": "Research",
+      "description": "Legal research"
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": "Bookmark",
+      "description": "User bookmarks"
+    }
+  }
+}

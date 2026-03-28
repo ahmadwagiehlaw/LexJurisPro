@@ -1,0 +1,9 @@
+{
+  "name": "LawBase - Lex Juris Pro",
+  "description": "A professional legal operating system for judges, counselors, and legal offices.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

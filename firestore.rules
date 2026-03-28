@@ -1,0 +1,236 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required, immutable) - Unique identifier
+    //   - email: string (required, immutable) - User's email
+    //   - displayName: string (optional) - User's display name
+    //   - photoURL: string (optional) - User's profile photo URL
+    //   - role: string (required, enum: ["admin", "lawyer", "assistant"]) - User's role
+    //   - createdAt: timestamp (required, immutable) - When the user profile was created
+    //
+    // Collection: cases
+    // Document ID: {caseId}
+    // Fields:
+    //   - id: string (optional) - Case reference number
+    //   - title: string (required) - Case title
+    //   - client: string (required) - Client name
+    //   - court: string (optional) - Court name
+    //   - type: string (optional) - Type of case
+    //   - status: string (optional) - Current status
+    //   - statusColor: string (optional) - Tailwind color class
+    //   - nextSession: string (optional) - Date of the next session
+    //   - urgent: bool (optional) - Whether the case is urgent
+    //   - uid: string (required, immutable) - Owner UID
+    //   - createdAt: timestamp (required, immutable) - When the case was created
+    //   - updatedAt: timestamp (required) - When the case was last updated
+    //
+    // Collection: sessions
+    // Document ID: {sessionId}
+    // Fields:
+    //   - caseId: string (optional) - Reference to the Case ID
+    //   - time: string (optional) - Session time
+    //   - date: string (required) - Session date
+    //   - title: string (required) - Session title
+    //   - court: string (optional) - Court name
+    //   - chamber: string (optional) - Chamber or room
+    //   - client: string (optional) - Client name
+    //   - opponent: string (optional) - Opponent name
+    //   - status: string (optional) - Session status
+    //   - statusColor: string (optional) - Tailwind color class
+    //   - uid: string (required, immutable) - Owner UID
+    //   - createdAt: timestamp (required, immutable) - When the session was created
+    //
+    // Collection: documents
+    // Document ID: {docId}
+    // Fields:
+    //   - name: string (required) - File name
+    //   - type: string (optional) - Document type
+    //   - size: string (optional) - File size
+    //   - url: string (required) - File URL
+    //   - caseId: string (optional) - Reference to the Case ID
+    //   - uid: string (required, immutable) - Owner UID
+    //   - createdAt: timestamp (required, immutable) - When the document was uploaded
+    //
+    // Collection: research
+    // Document ID: {researchId}
+    // Fields:
+    //   - title: string (required) - Research title
+    //   - date: string (optional) - Publication date
+    //   - court: string (optional) - Court name
+    //   - category: string (optional) - Legal category
+    //   - content: string (optional) - Research content or summary
+    //   - uid: string (required, immutable) - Owner UID
+    //   - createdAt: timestamp (required, immutable) - When the research was added
+    //
+    // Collection: bookmarks
+    // Document ID: {bookmarkId}
+    // Fields:
+    //   - title: string (required) - Bookmark title
+    //   - source: string (optional) - Resource source
+    //   - type: string (optional) - Resource type
+    //   - uid: string (required, immutable) - Owner UID
+    //   - createdAt: timestamp (required, immutable) - When the bookmark was added
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "ahmad.wagieh@gmail.com" && request.auth.token.email_verified == true ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             (data.role in ['admin', 'lawyer', 'assistant']) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidCase(data) {
+      return hasRequiredFields(['title', 'client', 'uid', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.client is string && data.client.size() > 0 && data.client.size() < 100 &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidSession(data) {
+      return hasRequiredFields(['title', 'date', 'uid', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.date is string &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidDocument(data) {
+      return hasRequiredFields(['name', 'url', 'uid', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.url is string && isValidUrl(data.url) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidResearch(data) {
+      return hasRequiredFields(['title', 'uid', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBookmark(data) {
+      return hasRequiredFields(['title', 'uid', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'lawyer' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /cases/{caseId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidCase(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidCase(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidSession(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidSession(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /documents/{docId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidDocument(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidDocument(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /research/{researchId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidResearch(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidResearch(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /bookmarks/{bookmarkId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidBookmark(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidBookmark(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
